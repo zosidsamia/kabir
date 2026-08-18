@@ -63,6 +63,22 @@ try {
         Response::ok('Visit permanently deleted', ['id' => $id]);
     }
 
+    // Soft-delete permission check: restrict to users with 'delete_data' or 'manage_visits' or admin
+    $canSoftDelete = false;
+    if (isset($user['role']) && $user['role'] === 'admin') {
+        $canSoftDelete = true;
+    }
+    if (!$canSoftDelete && function_exists('hasPermission') && hasPermission($user, 'delete_data')) {
+        $canSoftDelete = true;
+    }
+    if (!$canSoftDelete && function_exists('hasPermission') && hasPermission($user, 'manage_visits')) {
+        $canSoftDelete = true;
+    }
+    if (!$canSoftDelete) {
+        DB::rollback();
+        Response::error('Soft delete is restricted to authorized roles', [], 403);
+    }
+
     // Soft-delete path
     $nowUpdate = DB::execute('UPDATE visits SET is_deleted = 1, deleted_at = NOW(), updated_at = NOW() WHERE id = :id', [':id' => $id]);
 
