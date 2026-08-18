@@ -27,7 +27,7 @@ if ($id <= 0) {
 }
 
 try {
-    $sql = 'SELECT v.id, v.patient_id, v.visit_type, v.visit_date, v.chief_complaint, v.vital_signs, v.history_of_present_illness, v.physical_examination, v.diagnosis, v.notes, v.created_by, v.created_at, v.updated_at, '
+    $sql = 'SELECT v.id, v.patient_id, v.visit_type, v.visit_date, v.chief_complaint, v.vital_signs, v.history_of_present_illness, v.physical_examination, v.diagnosis, v.notes, v.created_by, v.created_at, v.updated_at '
          . 'p.full_name AS patient_name, p.phone AS patient_phone, p.register_number AS patient_register_number, '
          . 'u.full_name AS doctor_name '
          . 'FROM visits v '
@@ -41,7 +41,7 @@ try {
         Response::error('Visit not found', [], 404);
     }
 
-    // Normalize output
+    // Normalize output (patient and doctor summary only)
     $out = [];
     $out['id'] = isset($visit['id']) ? (int)$visit['id'] : null;
     $out['patient_id'] = isset($visit['patient_id']) ? (int)$visit['patient_id'] : null;
@@ -51,11 +51,14 @@ try {
     $out['visit_type'] = $visit['visit_type'] ?? null;
     $out['visit_date'] = $visit['visit_date'] ?? null;
     $out['chief_complaint'] = $visit['chief_complaint'] ?? null;
-    $out['vital_signs'] = [];
+
+    // Decode vital_signs JSON safely
+    $out['vital_signs'] = null;
     if (!empty($visit['vital_signs'])) {
         $decoded = json_decode($visit['vital_signs'], true);
-        $out['vital_signs'] = $decoded !== null ? $decoded : [];
+        $out['vital_signs'] = $decoded !== null ? $decoded : null;
     }
+
     $out['history_of_present_illness'] = $visit['history_of_present_illness'] ?? null;
     $out['physical_examination'] = $visit['physical_examination'] ?? null;
     $out['diagnosis'] = $visit['diagnosis'] ?? null;
@@ -64,6 +67,15 @@ try {
     $out['doctor_name'] = $visit['doctor_name'] ?? null;
     $out['created_at'] = $visit['created_at'] ?? null;
     $out['updated_at'] = $visit['updated_at'] ?? null;
+
+    // Audit: record that this user viewed the visit
+    try {
+        $userId = isset($user['id']) ? (int)$user['id'] : null;
+        logAudit($userId, $out['patient_id'], 'view', 'visit', $out['id']);
+    } catch (Throwable $ae) {
+        // logAudit swallows errors, but be safe here
+        error_log('Audit log (view visit) failed: ' . $ae->getMessage());
+    }
 
     Response::ok('Visit retrieved', ['visit' => $out]);
 
