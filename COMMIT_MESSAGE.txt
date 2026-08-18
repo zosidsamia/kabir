@@ -1,0 +1,1 @@
+Remove sensitive and runtime files from HEAD and add to .gitignore

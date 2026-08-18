@@ -1,0 +1,16 @@
+# .gitignore additions
+
+# runtime and sensitive
+.env
+.htpasswd-phpmyadmin
+dr.armankabir-main.zip
+public_html/phpmyadmin/
+access-logs
+error_log
+public_html/error_log
+server-data/
+logs/
+tmp/
+.lastlogin
+.myimunify_id
+.imunify_patch_id
