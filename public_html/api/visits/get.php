@@ -27,18 +27,39 @@ if ($id <= 0) {
 }
 
 try {
-    $sql = 'SELECT v.id, v.patient_id, v.visit_type, v.visit_date, v.chief_complaint, v.vital_signs, v.history_of_present_illness, v.physical_examination, v.diagnosis, v.notes, v.created_by, v.created_at, v.updated_at '
+    $sql = 'SELECT v.id, v.patient_id, v.visit_type, v.visit_date, v.chief_complaint, v.vital_signs, v.history_of_present_illness, v.physical_examination, v.diagnosis, v.notes, v.created_by, v.created_at, v.updated_at, '
          . 'p.full_name AS patient_name, p.phone AS patient_phone, p.register_number AS patient_register_number, '
          . 'u.full_name AS doctor_name '
          . 'FROM visits v '
          . 'LEFT JOIN patients p ON v.patient_id = p.id '
          . 'LEFT JOIN users u ON v.created_by = u.id '
-         . 'WHERE v.id = :id LIMIT 1';
+         . 'WHERE v.id = :id AND (v.is_deleted = 0 OR v.is_deleted IS NULL) LIMIT 1';
 
     $visit = DB::fetchOne($sql, [':id' => $id]);
 
     if (!$visit) {
         Response::error('Visit not found', [], 404);
+    }
+
+    // Authorization: allow if admin, if user has view_all_patients permission, or if the session is a patient matching the visit
+    $allowed = false;
+    // admin check: only admin role
+    if (isset($user['role']) && $user['role'] === 'admin') {
+        $allowed = true;
+    }
+    // role-based permission
+    if (!$allowed && hasPermission($user, 'view_all_patients')) {
+        $allowed = true;
+    }
+    // patient session accessing own visit
+    if (!$allowed && isset($user['session_type']) && $user['session_type'] === 'patient') {
+        if (isset($user['patient_id']) && isset($visit['patient_id']) && (int)$user['patient_id'] === (int)$visit['patient_id']) {
+            $allowed = true;
+        }
+    }
+
+    if (!$allowed) {
+        Response::error('Access denied. You do not have permission to view this visit.', [], 403);
     }
 
     // Normalize output (patient and doctor summary only)
